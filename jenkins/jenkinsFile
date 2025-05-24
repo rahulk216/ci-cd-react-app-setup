@@ -1,6 +1,10 @@
 pipeline {
   agent any
 
+  triggers {
+    githubPush() // Auto trigger on push
+  }
+
   parameters {
     choice(name: 'ENV', choices: ['development', 'production'], description: 'Select environment')
   }
