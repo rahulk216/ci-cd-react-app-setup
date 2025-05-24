@@ -2,14 +2,14 @@ pipeline {
   agent any
 
   parameters {
-    choice(name: 'ENV', choices: ['development', 'production'], description: 'Which environment to deploy to?')
+    choice(name: 'ENV', choices: ['development', 'production'], description: 'Deployment Environment')
   }
 
   environment {
-    IMAGE_NAME = "my-react-app-${params.ENV}"
-    CONTAINER_NAME = "my-react-container-${params.ENV}"
-    BUILD_ARG = "${params.ENV}"
-    PORT = params.ENV == "development" ? "3000" : "80"
+    IMAGE_NAME = "react-app-${params.ENV}"
+    CONTAINER_NAME = "react-container-${params.ENV}"
+    ENV_PATH = "/var/jenkins_envs/.env.${params.ENV}"
+    PORT = params.ENV == 'production' ? "80" : "3000"
   }
 
   stages {
@@ -19,29 +19,29 @@ pipeline {
       }
     }
 
-    stage('Build Docker Image') {
+    stage('Inject Env File') {
       steps {
-        sh "docker build --build-arg MODE=${BUILD_ARG} -t ${IMAGE_NAME} ."
+        sh "cp ${ENV_PATH} .env"
       }
     }
 
-    stage('Deploy') {
+    stage('Build Docker Image') {
       steps {
-        script {
-          // Stop and remove old container if exists
-          sh """
-            docker stop ${CONTAINER_NAME} || true
-            docker rm ${CONTAINER_NAME} || true
-          """
+        sh """
+          docker build \
+            --build-arg MODE=${params.ENV} \
+            -t ${IMAGE_NAME} .
+        """
+      }
+    }
 
-          // Run the container
-          sh """
-            docker run -d \
-              --name ${CONTAINER_NAME} \
-              -p ${PORT}:80 \
-              ${IMAGE_NAME}
-          """
-        }
+    stage('Deploy Docker Container') {
+      steps {
+        sh """
+          docker stop ${CONTAINER_NAME} || true
+          docker rm ${CONTAINER_NAME} || true
+          docker run -d --name ${CONTAINER_NAME} -p ${PORT}:80 ${IMAGE_NAME}
+        """
       }
     }
   }
